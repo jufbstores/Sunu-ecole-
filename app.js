@@ -27,13 +27,13 @@ const SUBJECTS = {
   lycee: [
     {em:"🖊️", label:"Français"}, {em:"🔢", label:"Mathématiques"},
     {em:"🏺", label:"Histoire-Géo"}, {em:"🧬", label:"SVT"},
-    {em:"⚗️", label:"Physique-Chimie"}, {em:"🗣️", label:"Anglais"}, {em:"📗", label:"Arabe"}
+    {em:"⚗️", label:"Physique-Chimie"}, {em:"🗣️", label:"Anglais"}, {em:"🇪🇸", label:"Espagnol"}
   ]
 };
 
-// Matières qui n'apparaissent qu'à partir de la 4ème (Physique-Chimie, Arabe)
+// Matières qui n'apparaissent qu'à partir de la 4ème (Physique-Chimie, Espagnol)
 const COLLEGE_MATIERES_4E_3E = [
-  {em:"⚗️", label:"Physique-Chimie"}, {em:"📗", label:"Arabe"}
+  {em:"⚗️", label:"Physique-Chimie"}, {em:"🇪🇸", label:"Espagnol"}
 ];
 
 // Matières de 2nde selon la série (L ou S) — pas encore de Philosophie
@@ -41,12 +41,12 @@ const LYCEE_MATIERES_2NDE = {
   L: [
     {em:"🖊️", label:"Français"}, {em:"🔢", label:"Mathématiques"},
     {em:"🏺", label:"Histoire-Géo"}, {em:"🧬", label:"SVT"},
-    {em:"⚗️", label:"Physique-Chimie"}, {em:"🗣️", label:"Anglais"}, {em:"📗", label:"Arabe"}
+    {em:"⚗️", label:"Physique-Chimie"}, {em:"🗣️", label:"Anglais"}, {em:"🇪🇸", label:"Espagnol"}
   ],
   S: [
     {em:"🖊️", label:"Français"}, {em:"🔢", label:"Mathématiques"},
     {em:"🏺", label:"Histoire-Géo"}, {em:"🧬", label:"SVT"},
-    {em:"⚗️", label:"Physique-Chimie"}, {em:"🗣️", label:"Anglais"}, {em:"📗", label:"Arabe"}
+    {em:"⚗️", label:"Physique-Chimie"}, {em:"🗣️", label:"Anglais"}, {em:"🇪🇸", label:"Espagnol"}
   ]
 };
 
@@ -55,17 +55,17 @@ const LYCEE_MATIERES_PAR_SERIE = {
   L: [
     {em:"🖊️", label:"Français"}, {em:"📖", label:"Littérature"}, {em:"🧠", label:"Philosophie"},
     {em:"🔢", label:"Mathématiques"}, {em:"🏺", label:"Histoire-Géo"},
-    {em:"🗣️", label:"Anglais"}, {em:"📗", label:"Arabe"}
+    {em:"🗣️", label:"Anglais"}, {em:"🇪🇸", label:"Espagnol"}
   ],
   S: [
     {em:"🖊️", label:"Français"}, {em:"🧠", label:"Philosophie"}, {em:"🔢", label:"Mathématiques"},
     {em:"⚗️", label:"Physique-Chimie"}, {em:"🧬", label:"SVT"}, {em:"🏺", label:"Histoire-Géo"},
-    {em:"🗣️", label:"Anglais"}, {em:"📗", label:"Arabe"}
+    {em:"🗣️", label:"Anglais"}, {em:"🇪🇸", label:"Espagnol"}
   ],
   G: [
     {em:"🖊️", label:"Français"}, {em:"🧠", label:"Philosophie"}, {em:"🔢", label:"Mathématiques"},
     {em:"💰", label:"Économie"}, {em:"🏺", label:"Histoire-Géo"},
-    {em:"🗣️", label:"Anglais"}, {em:"📗", label:"Arabe"}
+    {em:"🗣️", label:"Anglais"}, {em:"🇪🇸", label:"Espagnol"}
   ]
 };
 
@@ -93,7 +93,7 @@ const OBJECTIFS = [
 
 const TEMPS = [10,15,20,30,45,60,90];
 const ORDER = ["welcome","prenom","profil","niveau","classe","serie","matieres","objectifs","temps","nbenfants","pricing","final","form","success"];
-const NO_HEADER = ["welcome","final","form","success","login","loginSuccess","espace","lecon","quiz","fiche","flashlist","defi","coach"];
+const NO_HEADER = ["welcome","final","form","success","login","loginSuccess","espace","lecon","quiz","fiche","flashlist","defi","coach","paiementAttente","paiementEchec"];
 const WELCOME_SLIDES = [
   { kind:"subjects", title:"Les bonnes notes démarrent sous le baobab !", sub:"Pour toute la famille, du CI à la Terminale, dans toutes les matières !" },
   { kind:"method", title:"Une méthode qui unit tradition et technologie", sub:"Plus de 10 000 contenus créés, vérifiés et conformes au programme sénégalais." },
@@ -117,7 +117,7 @@ const BUBBLES = {
 let step = "welcome";
 let sessionActive = false;
 let ans = { prenom:"", profil:null, consentAge:false, niveau:null, classe:null, serie:null,
-  matieres:[], objectifs:[], temps:2, nbEnfants:null, plan:"premium", duree:"12mois" };
+  matieres:[], objectifs:[], temps:2, nbEnfants:null, plan:"premium", duree:"12mois", methodePaiement:"paydunya" };
 
 function getPrice(plan, duree){
   const isPremium = plan === "premium";
@@ -203,6 +203,8 @@ function body(){
     case "final": return viewFinal();
     case "form": return viewForm();
     case "success": return viewSuccess();
+    case "paiementAttente": return viewPaiementAttente();
+    case "paiementEchec": return viewPaiementEchec();
     case "login": return viewLogin();
     case "loginSuccess": return viewLoginSuccess();
     case "espace": return viewEspace();
@@ -766,9 +768,10 @@ async function submitAccount(){
       }).select().single();
       if(eleveErr) throw eleveErr;
 
-      const { error: aboErr } = await sb.from('abonnements').insert({
-        user_id: userId, plan: ans.plan, duree: ans.duree, prix_fcfa: prix
-      });
+      const { data: aboRow, error: aboErr } = await sb.from('abonnements').insert({
+        user_id: userId, plan: ans.plan, duree: ans.duree, prix_fcfa: prix,
+        methode_paiement: ans.methodePaiement, statut: 'en_attente'
+      }).select().single();
       if(aboErr) throw aboErr;
 
       if(ans.matieres.length){
@@ -780,7 +783,18 @@ async function submitAccount(){
         if(oErr) throw oErr;
       }
 
-      sessionActive = true; step = 'success'; render();
+      // On lance le paiement Orange Money : le navigateur est redirigé vers la
+      // page de paiement hébergée, puis Orange nous renvoie sur l'app.
+      const payRes = await fetch('/api/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ abonnement_id: aboRow.id })
+      });
+      const payData = await payRes.json();
+      if(!payRes.ok || !payData.payment_url) throw new Error(payData.error || "Impossible de lancer le paiement, réessaie.");
+
+      window.location.href = payData.payment_url;
+      return; // La page va se recharger via la redirection, inutile de continuer.
     } else {
       msg.style.color = '#fff';
       msg.textContent = "Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis reconnecte-toi pour finaliser le profil.";
@@ -804,7 +818,7 @@ function viewSuccess(){
     <h2>Bienvenue sur Sunu École, ${name} t'attend !</h2>
     <p>Ton espace de révision 100% conforme au programme sénégalais est prêt : cours, fiches, quiz et coach IA t'accompagnent jusqu'au BFEM ou au Bac.</p>
     <button class="cta" style="max-width:260px;" onclick="openEspace()">📖 Découvrir mes cours</button>
-    <button class="wlogin" style="margin-top:14px;" onclick="step='prenom'; ans={prenom:'',profil:null,consentAge:false,niveau:null,classe:null,serie:null,matieres:[],objectifs:[],temps:2,nbEnfants:null,plan:'premium',duree:'12mois'}; render();">Recommencer la démo</button>
+    <button class="wlogin" style="margin-top:14px;" onclick="step='prenom'; ans={prenom:'',profil:null,consentAge:false,niveau:null,classe:null,serie:null,matieres:[],objectifs:[],temps:2,nbEnfants:null,plan:'premium',duree:'12mois',methodePaiement:'paydunya'}; render();">Recommencer la démo</button>
   </div>`;
 }
 
@@ -1162,4 +1176,101 @@ function viewCoach(){
   </div>`;
 }
 
-render();
+/* ---------------- Retour de paiement Orange Money ---------------- */
+let pendingAbonnementId = null;
+let paiementPollCount = 0;
+let paiementEchecRaison = 'echoue';
+
+function viewPaiementAttente(){
+  return `
+  <div class="final-wrap" style="align-items:center; justify-content:center; text-align:center;">
+    <div class="lion-big" style="font-size:56px;">🦁⏳</div>
+    <h2 style="color:#fff; margin-top:14px;">Vérification du paiement...</h2>
+    <p style="color:#F6E6D6; font-size:14px; margin-top:8px; max-width:280px;">Merci de patienter quelques instants pendant que nous confirmons ton paiement.</p>
+  </div>`;
+}
+
+function viewPaiementEchec(){
+  const messages = {
+    annule: {titre:"Paiement annulé", texte:"Tu as annulé le paiement avant sa validation. Aucune somme n'a été débitée."},
+    echoue: {titre:"Le paiement n'a pas abouti", texte:"La transaction a échoué. Aucun montant ne devrait avoir été débité ; vérifie ton solde et réessaie."},
+    lent: {titre:"Vérification plus longue que prévue", texte:"Ton paiement est peut-être toujours en cours de traitement. Réessaie de vérifier dans une minute."}
+  };
+  const m = messages[paiementEchecRaison] || messages.echoue;
+  return `
+  <div class="final-wrap" style="align-items:center; justify-content:center; text-align:center;">
+    <div class="lion-big" style="font-size:56px;">🦁</div>
+    <h2 style="color:#fff; margin-top:14px;">${m.titre}</h2>
+    <p style="color:#F6E6D6; font-size:14px; margin:8px 0 20px; max-width:280px;">${m.texte}</p>
+    ${paiementEchecRaison==='lent' ? `<button class="cta" onclick="retryPaymentCheck()">Revérifier maintenant</button>` : ''}
+    <button class="wlogin" style="margin-top:12px;" onclick="goHome();">Retour à l'accueil</button>
+  </div>`;
+}
+
+function retryPaymentCheck(){
+  paiementPollCount = 0;
+  step = 'paiementAttente'; render();
+  pollPaymentStatus();
+}
+
+async function hydratePrenomFromSession(){
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+    const { data: eleve } = await sb.from('eleves').select('prenom').eq('user_id', session.user.id).order('id',{ascending:false}).limit(1).single();
+    if(eleve && eleve.prenom) ans.prenom = eleve.prenom;
+  }catch(e){ /* pas grave : un texte générique s'affichera à la place du prénom */ }
+}
+
+async function pollPaymentStatus(){
+  paiementPollCount++;
+  const { data, error } = await sb.from('abonnements').select('statut').eq('id', pendingAbonnementId).single();
+
+  if(!error && data && data.statut === 'actif'){
+    sessionActive = true;
+    await hydratePrenomFromSession();
+    step = 'success'; render();
+    return;
+  }
+  if(!error && data && data.statut === 'echoue'){
+    paiementEchecRaison = 'echoue';
+    step = 'paiementEchec'; render();
+    return;
+  }
+  if(paiementPollCount >= 14){ // ~35 secondes d'attente avant d'abandonner le polling automatique
+    paiementEchecRaison = 'lent';
+    step = 'paiementEchec'; render();
+    return;
+  }
+  setTimeout(pollPaymentStatus, 2500);
+}
+
+// Vérifie, au chargement de la page, si l'utilisateur revient d'un paiement
+// Orange Money (redirection avec ?paiement=retour|annule&abonnement=ID).
+// Retourne true si un tel retour a été détecté et pris en charge (auquel cas
+// il ne faut pas exécuter le render() par défaut de l'écran d'accueil).
+async function checkPaymentReturn(){
+  const params = new URLSearchParams(window.location.search);
+  const paiement = params.get('paiement');
+  const abonnementId = params.get('abonnement');
+  if(!paiement || !abonnementId) return false;
+
+  // Nettoie l'URL pour éviter de relancer la vérification si l'utilisateur recharge la page.
+  history.replaceState({}, '', window.location.pathname);
+
+  if(paiement === 'annule'){
+    paiementEchecRaison = 'annule';
+    step = 'paiementEchec';
+    render();
+    return true;
+  }
+
+  pendingAbonnementId = abonnementId;
+  step = 'paiementAttente';
+  render();
+  await sb.auth.getSession(); // s'assure que la session est bien restaurée avant d'interroger la base
+  pollPaymentStatus();
+  return true;
+}
+
+checkPaymentReturn().then(handled => { if(!handled) render(); });
